@@ -1,0 +1,302 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% load cointrack_tags %}
+{% block title %}Dashboard — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header flex items-center justify-between fade-in">
+        <div>
+            <div class="page-title">Good morning, {{ user.first_name|default:user.username }} 👋</div>
+            <div class="page-subtitle">Here's your portfolio summary for today.</div>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('addAssetModal').classList.add('open')">
+            + Add Asset
+        </button>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="grid-4 mb-24 fade-in-1">
+        <div class="stat-card">
+            <div class="stat-label">Total Portfolio Value</div>
+            <div class="stat-value">{{ total_value|default:"$24,831" }}</div>
+            <div class="stat-change pos">▲ +{{ total_change_pct|default:"4.21" }}% today</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">24h Profit / Loss</div>
+            <div class="stat-value pos">+{{ daily_pnl|default:"$1,003" }}</div>
+            <div class="stat-change text-muted">vs yesterday</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">All-Time Profit</div>
+            <div class="stat-value pos">+{{ total_pnl|default:"$6,210" }}</div>
+            <div class="stat-change text-muted">since inception</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Holdings</div>
+            <div class="stat-value">{{ holdings_count|default:"8" }}</div>
+            <div class="stat-change text-muted">across {{ networks_count|default:"4" }} networks</div>
+        </div>
+    </div>
+
+    <!-- Charts + Holdings -->
+    <div style="display:grid; grid-template-columns:2fr 1fr; gap:16px;" class="fade-in-2">
+
+        <!-- Portfolio Chart -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-16">
+                <div class="section-title">Portfolio Performance</div>
+                <div style="display:flex; gap:4px;">
+                    {% for period in "1D 7D 1M 3M 1Y ALL"|split:" " %}
+                    <button class="btn btn-ghost btn-sm chart-period" data-period="{{ period }}" onclick="setChartPeriod('{{ period }}', this)">{{ period }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <canvas id="portfolioChart" height="200"></canvas>
+        </div>
+
+        <!-- Allocation -->
+        <div class="card">
+            <div class="section-title">Allocation</div>
+            <div class="allocation-bar" id="allocBar">
+                {% for holding in top_holdings %}
+                <div class="alloc-seg" style="flex:{{ holding.pct|default:25 }}; background:{{ holding.color|default:'var(--accent)' }};" title="{{ holding.symbol|default:'BTC' }} {{ holding.pct|default:25 }}%"></div>
+                {% empty %}
+                <div class="alloc-seg" style="flex:45; background:var(--accent);" title="BTC 45%"></div>
+                <div class="alloc-seg" style="flex:25; background:#58a6ff;" title="ETH 25%"></div>
+                <div class="alloc-seg" style="flex:15; background:var(--yellow);" title="SOL 15%"></div>
+                <div class="alloc-seg" style="flex:15; background:#ff4d6a;" title="Other 15%"></div>
+                {% endfor %}
+            </div>
+            <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+                {% for holding in top_holdings %}
+                <div class="flex items-center justify-between" style="font-size:13px;">
+                    <div class="flex items-center gap-8">
+                        <div style="width:10px;height:10px;border-radius:2px;background:{{ holding.color|default:'var(--accent)' }};"></div>
+                        {{ holding.symbol|default:"BTC" }}
+                    </div>
+                    <span class="text-muted">{{ holding.pct|default:"45" }}%</span>
+                </div>
+                {% empty %}
+                <div class="flex items-center justify-between" style="font-size:13px;"><div class="flex items-center gap-8"><div style="width:10px;height:10px;border-radius:2px;background:var(--accent);"></div>BTC</div><span class="text-muted">45%</span></div>
+                <div class="flex items-center justify-between" style="font-size:13px;"><div class="flex items-center gap-8"><div style="width:10px;height:10px;border-radius:2px;background:#58a6ff;"></div>ETH</div><span class="text-muted">25%</span></div>
+                <div class="flex items-center justify-between" style="font-size:13px;"><div class="flex items-center gap-8"><div style="width:10px;height:10px;border-radius:2px;background:var(--yellow);"></div>SOL</div><span class="text-muted">15%</span></div>
+                <div class="flex items-center justify-between" style="font-size:13px;"><div class="flex items-center gap-8"><div style="width:10px;height:10px;border-radius:2px;background:var(--red);"></div>Other</div><span class="text-muted">15%</span></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Holdings + Activity -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;" class="fade-in-3">
+
+        <!-- Top Holdings -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-8">
+                <div class="section-title">Top Holdings</div>
+                <a href="{% url 'portfolio' %}" class="text-sm text-muted">View all →</a>
+            </div>
+            {% for holding in holdings %}
+            <div class="holding-row">
+                <div class="coin-icon" style="background:{{ holding.color|default:'var(--accent-dim)' }}; color:{{ holding.text_color|default:'var(--accent)' }};">{{ holding.symbol|default:"BTC"|slice:":2" }}</div>
+                <div style="flex:1;">
+                    <div style="font-size:13px; font-weight:700;">{{ holding.name|default:"Bitcoin" }}</div>
+                    <div class="text-sm text-muted">{{ holding.amount|default:"0.42" }} {{ holding.symbol|default:"BTC" }}</div>
+                </div>
+                <div class="text-right">
+                    <div style="font-size:13px; font-weight:700;">{{ holding.value|default:"$28,310" }}</div>
+                    <div class="text-sm {% if holding.change_pct >= 0 %}pos{% else %}neg{% endif %}">
+                        {% if holding.change_pct >= 0 %}▲{% else %}▼{% endif %} {{ holding.change_pct|default:"2.4" }}%
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            {% for item in "BTC,ETH,SOL,BNB"|split:"," %}
+            <div class="holding-row">
+                <div class="coin-icon" style="background:var(--accent-dim); color:var(--accent);">{{ item|slice:":2" }}</div>
+                <div style="flex:1;"><div style="font-size:13px; font-weight:700;">{{ item }}</div><div class="text-sm text-muted">— units</div></div>
+                <div class="text-right"><div style="font-size:13px; font-weight:700;">—</div><div class="text-sm pos">—</div></div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-8">
+                <div class="section-title">Recent Activity</div>
+                <a href="{% url 'transactions' %}" class="text-sm text-muted">View all →</a>
+            </div>
+            {% for tx in recent_transactions %}
+            <div class="activity-item">
+                <div class="activity-dot" style="background:{% if tx.type == 'buy' %}var(--accent){% elif tx.type == 'sell' %}var(--red){% else %}var(--yellow){% endif %};"></div>
+                <div style="flex:1;">
+                    <div style="font-size:13px;">{{ tx.type|capfirst }} {{ tx.symbol }} <span class="text-muted">×{{ tx.amount }}</span></div>
+                    <div class="text-sm text-muted">{{ tx.date }}</div>
+                </div>
+                <div style="font-size:13px; font-weight:700; {% if tx.type == 'buy' %}color:var(--accent){% else %}color:var(--red){% endif %};">
+                    {% if tx.type == 'buy' %}-{% else %}+{% endif %}{{ tx.value }}
+                </div>
+            </div>
+            {% empty %}
+            <div class="activity-item"><div class="activity-dot" style="background:var(--accent);"></div><div style="flex:1;"><div style="font-size:13px;">Buy BTC ×0.05</div><div class="text-sm text-muted">2 hours ago</div></div><div style="font-size:13px; color:var(--accent); font-weight:700;">-$3,371</div></div>
+            <div class="activity-item"><div class="activity-dot" style="background:var(--red);"></div><div style="flex:1;"><div style="font-size:13px;">Sell ETH ×0.5</div><div class="text-sm text-muted">Yesterday</div></div><div style="font-size:13px; color:var(--red); font-weight:700;">+$1,760</div></div>
+            <div class="activity-item"><div class="activity-dot" style="background:var(--yellow);"></div><div style="flex:1;"><div style="font-size:13px;">Receive SOL ×10</div><div class="text-sm text-muted">3 days ago</div></div><div style="font-size:13px; color:var(--yellow); font-weight:700;">+$1,825</div></div>
+            <div class="activity-item"><div class="activity-dot" style="background:var(--accent);"></div><div style="flex:1;"><div style="font-size:13px;">Buy ETH ×1.2</div><div class="text-sm text-muted">5 days ago</div></div><div style="font-size:13px; color:var(--accent); font-weight:700;">-$4,224</div></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Alerts summary -->
+    {% if active_alerts %}
+    <div class="card mt-16 fade-in-4" style="border-color:var(--yellow); background:rgba(255,209,102,0.05);">
+        <div class="flex items-center gap-8">
+            <span style="color:var(--yellow); font-size:16px;">⚠</span>
+            <strong style="color:var(--yellow);">{{ active_alerts|length }} Price Alert{{ active_alerts|length|pluralize }} Triggered</strong>
+            <span class="text-muted text-sm">&mdash;</span>
+            <a href="{% url 'alerts' %}" class="text-sm" style="color:var(--yellow);">View alerts →</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Asset Modal -->
+<div class="modal-overlay" id="addAssetModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Add Asset</div>
+            <button class="modal-close" onclick="document.getElementById('addAssetModal').classList.remove('open')">✕</button>
+        </div>
+        <form method="post" action="{% url 'add_holding' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Cryptocurrency</label>
+                <select name="coin_id">
+                    <option value="">Select coin...</option>
+                    <option value="bitcoin">Bitcoin (BTC)</option>
+                    <option value="ethereum">Ethereum (ETH)</option>
+                    <option value="solana">Solana (SOL)</option>
+                    <option value="binancecoin">BNB</option>
+                    <option value="ripple">XRP</option>
+                    <option value="cardano">Cardano (ADA)</option>
+                    <option value="avalanche-2">Avalanche (AVAX)</option>
+                    <option value="dogecoin">Dogecoin (DOGE)</option>
+                </select>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" name="amount" placeholder="0.00" step="any" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Purchase Price ($)</label>
+                    <input type="number" name="purchase_price" placeholder="0.00" step="any" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Purchase Date</label>
+                <input type="date" name="purchase_date">
+            </div>
+            <div class="flex gap-8" style="justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addAssetModal').classList.remove('open')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Asset</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Simple canvas chart
+const canvas = document.getElementById('portfolioChart');
+if (canvas) {
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = 200;
+
+    const data = {{ chart_data|default:"[24000,23500,24200,24800,23900,24500,25200,24831]"|safe }};
+
+    function drawChart(data) {
+        const W = canvas.width, H = canvas.height;
+        const pad = { top: 10, right: 10, bottom: 30, left: 50 };
+        const iW = W - pad.left - pad.right;
+        const iH = H - pad.top - pad.bottom;
+        const mn = Math.min(...data), mx = Math.max(...data);
+        const range = mx - mn || 1;
+
+        ctx.clearRect(0, 0, W, H);
+
+        // Grid lines
+        ctx.strokeStyle = '#21262d';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = pad.top + (iH / 4) * i;
+            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+            ctx.fillStyle = '#484f58';
+            ctx.font = '10px Space Mono';
+            ctx.fillText('$' + Math.round(mx - (range/4)*i).toLocaleString(), 2, y + 4);
+        }
+
+        // Gradient fill
+        const grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+        grad.addColorStop(0, 'rgba(0,255,157,0.25)');
+        grad.addColorStop(1, 'rgba(0,255,157,0)');
+
+        const pts = data.map((v, i) => ({
+            x: pad.left + (iW / (data.length - 1)) * i,
+            y: pad.top + iH - ((v - mn) / range) * iH
+        }));
+
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+            const cp1x = pts[i-1].x + (pts[i].x - pts[i-1].x) / 2;
+            ctx.bezierCurveTo(cp1x, pts[i-1].y, cp1x, pts[i].y, pts[i].x, pts[i].y);
+        }
+        ctx.lineTo(pts[pts.length-1].x, H - pad.bottom);
+        ctx.lineTo(pts[0].x, H - pad.bottom);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Line
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+            const cp1x = pts[i-1].x + (pts[i].x - pts[i-1].x) / 2;
+            ctx.bezierCurveTo(cp1x, pts[i-1].y, cp1x, pts[i].y, pts[i].x, pts[i].y);
+        }
+        ctx.strokeStyle = '#00ff9d';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Dot at end
+        const last = pts[pts.length-1];
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ff9d';
+        ctx.fill();
+    }
+
+    drawChart(data);
+    window.addEventListener('resize', () => {
+        canvas.width = canvas.parentElement.clientWidth;
+        drawChart(data);
+    });
+}
+
+function setChartPeriod(period, el) {
+    document.querySelectorAll('.chart-period').forEach(b => b.classList.remove('active'));
+    el.style.borderColor = 'var(--accent)';
+    el.style.color = 'var(--accent)';
+    // In real app: fetch new data from API
+}
+</script>
+{% endblock %}

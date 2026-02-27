@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% load cointrack_tags %}
+{% block title %}Transactions — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header flex items-center justify-between fade-in">
+        <div>
+            <div class="page-title">Transactions</div>
+            <div class="page-subtitle">Full history of your trades &amp; transfers</div>
+        </div>
+        <div class="flex gap-8">
+            <a href="{% url 'export_transactions_csv' %}" class="btn btn-ghost">↓ Export</a>
+            <button class="btn btn-primary" onclick="document.getElementById('addTxModal').classList.add('open')">+ Log Transaction</button>
+        </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="grid-4 mb-24 fade-in-1">
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Total Bought</div>
+            <div style="font-family:var(--sans);font-size:20px;font-weight:800;margin-top:4px;color:var(--accent);">{{ total_bought|default:"$42,100" }}</div>
+        </div>
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Total Sold</div>
+            <div style="font-family:var(--sans);font-size:20px;font-weight:800;margin-top:4px;color:var(--red);">{{ total_sold|default:"$23,479" }}</div>
+        </div>
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Realised P&amp;L</div>
+            <div style="font-family:var(--sans);font-size:20px;font-weight:800;margin-top:4px;" class="pos">+{{ realised_pnl|default:"$3,840" }}</div>
+        </div>
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Transactions</div>
+            <div style="font-family:var(--sans);font-size:20px;font-weight:800;margin-top:4px;">{{ tx_count|default:"47" }}</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-row fade-in-2">
+        <select id="typeFilter" onchange="applyFilters()">
+            <option value="">All types</option>
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+            <option value="receive">Receive</option>
+            <option value="send">Send</option>
+        </select>
+        <select id="coinFilter" onchange="applyFilters()">
+            <option value="">All coins</option>
+            <option value="BTC">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="SOL">SOL</option>
+            <option value="BNB">BNB</option>
+        </select>
+        <input type="date" id="dateFrom" onchange="applyFilters()" placeholder="From">
+        <input type="date" id="dateTo" onchange="applyFilters()" placeholder="To">
+        <input type="search" id="txSearch" placeholder="Search..." oninput="applyFilters()" style="min-width:180px;">
+        <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+    </div>
+
+    <!-- Transaction Table -->
+    <div class="card fade-in-3" style="padding:0;overflow:hidden;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date &amp; Time</th>
+                    <th>Type</th>
+                    <th>Asset</th>
+                    <th>Amount</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th>Fee</th>
+                    <th>P&amp;L</th>
+                    <th>Note</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="txBody">
+                {% for tx in transactions %}
+                <tr data-type="{{ tx.type }}" data-coin="{{ tx.symbol }}" data-date="{{ tx.date }}">
+                    <td>
+                        <div style="font-size:13px;">{{ tx.date|date:"M d, Y" }}</div>
+                        <div class="text-sm text-muted">{{ tx.time|default:tx.date|time:"H:i" }}</div>
+                    </td>
+                    <td><span class="tx-type-badge tx-{{ tx.type }}">{{ tx.type|upper }}</span></td>
+                    <td>
+                        <div class="flex items-center gap-8">
+                            <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">{{ tx.symbol|slice:":2" }}</div>
+                            {{ tx.symbol }}
+                        </div>
+                    </td>
+                    <td>{{ tx.amount }}</td>
+                    <td>${{ tx.price }}</td>
+                    <td style="font-weight:700;">${{ tx.total }}</td>
+                    <td class="text-muted">${{ tx.fee|default:"0.00" }}</td>
+                    <td class="{% if tx.pnl >= 0 %}pos{% else %}neg{% endif %}">${{ tx.pnl|default:"—" }}</td>
+                    <td class="text-muted" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ tx.note|default:"—" }}</td>
+                    <td>
+                        <div class="flex gap-8">
+                            <button class="btn btn-ghost btn-sm" onclick="editTx('{{ tx.id }}')">Edit</button>
+                            <form method="post" action="{% url 'delete_transaction' tx.id %}" style="display:inline;" onsubmit="return confirm('Delete transaction?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm">✕</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                {% for tx in "buy/BTC/0.05/67420/3371,sell/ETH/0.5/3521/1760,receive/SOL/10/182.50/1825,buy/ETH/1.2/3520/4224,sell/BTC/0.1/65000/6500,buy/ADA/1000/0.48/480"|split:"," %}
+                {% with p=tx|split:"/" %}
+                <tr data-type="{{ p.0 }}" data-coin="{{ p.1 }}" data-date="2024-01-15">
+                    <td><div style="font-size:13px;">Jan 15, 2024</div><div class="text-sm text-muted">14:23</div></td>
+                    <td><span class="tx-type-badge tx-{{ p.0 }}">{{ p.0|upper }}</span></td>
+                    <td>
+                        <div class="flex items-center gap-8">
+                            <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">{{ p.1|slice:":2" }}</div>
+                            {{ p.1 }}
+                        </div>
+                    </td>
+                    <td>{{ p.2 }}</td>
+                    <td>${{ p.3 }}</td>
+                    <td style="font-weight:700;">${{ p.4 }}</td>
+                    <td class="text-muted">$2.50</td>
+                    <td class="{% if p.0 == 'sell' %}pos{% else %}neg{% endif %}">{% if p.0 == 'sell' %}+$210{% else %}—{% endif %}</td>
+                    <td class="text-muted">—</td>
+                    <td><div class="flex gap-8"><button class="btn btn-ghost btn-sm">Edit</button></div></td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between mt-16 fade-in-4" style="font-size:13px; color:var(--text-2);">
+        <div>Showing {{ page_start|default:"1" }}–{{ page_end|default:"20" }} of {{ tx_count|default:"47" }} transactions</div>
+        <div class="flex gap-8">
+            {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}" class="btn btn-ghost btn-sm">← Prev</a>{% endif %}
+            <span style="padding:5px 12px; background:var(--accent-dim); border:1px solid var(--accent-mid); border-radius:var(--radius); color:var(--accent); font-size:12px;">{{ page.number|default:1 }}</span>
+            {% if page.has_next %}<a href="?page={{ page.next_page_number }}" class="btn btn-ghost btn-sm">Next →</a>{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="addTxModal">
+    <div class="modal" style="max-width:520px;">
+        <div class="modal-header">
+            <div class="modal-title">Log Transaction</div>
+            <button class="modal-close" onclick="document.getElementById('addTxModal').classList.remove('open')">✕</button>
+        </div>
+        <form method="post" action="{% url 'add_transaction' %}">
+            {% csrf_token %}
+
+            <!-- Type selector -->
+            <div class="form-group">
+                <label>Transaction Type</label>
+                <div style="display:flex; gap:8px;">
+                    {% for t in "Buy,Sell,Receive,Send"|split:"," %}
+                    <label style="flex:1; display:flex; align-items:center; justify-content:center; padding:10px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:12px; text-transform:none; letter-spacing:0; color:var(--text-2); transition:all 0.15s; margin:0;">
+                        <input type="radio" name="type" value="{{ t|lower }}" style="display:none;" onchange="this.closest('div').querySelectorAll('label').forEach(l=>l.style.setProperty('background','var(--bg-2)')); this.parentElement.style.setProperty('background','var(--accent-dim)'); this.parentElement.style.setProperty('color','var(--accent)'); this.parentElement.style.setProperty('border-color','var(--accent-mid)');">
+                        {{ t }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Cryptocurrency</label>
+                    <select name="coin_id" required>
+                        <option value="">Select...</option>
+                        <option value="bitcoin">Bitcoin (BTC)</option>
+                        <option value="ethereum">Ethereum (ETH)</option>
+                        <option value="solana">Solana (SOL)</option>
+                        <option value="binancecoin">BNB</option>
+                        <option value="ripple">XRP</option>
+                        <option value="cardano">ADA</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date &amp; Time</label>
+                    <input type="datetime-local" name="datetime" required>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Amount (coins)</label>
+                    <input type="number" name="amount" placeholder="0.00" step="any" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Price per Coin ($)</label>
+                    <input type="number" name="price_per_coin" placeholder="0.00" step="any" min="0">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Fee ($)</label>
+                    <input type="number" name="fee" placeholder="0.00" step="any" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Exchange / Wallet</label>
+                    <select name="exchange">
+                        <option value="">Select...</option>
+                        <option>Binance</option>
+                        <option>Coinbase</option>
+                        <option>Kraken</option>
+                        <option>Bybit</option>
+                        <option>OKX</option>
+                        <option>MetaMask</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Note (optional)</label>
+                <input type="text" name="note" placeholder="e.g. DCA purchase, salary payment...">
+            </div>
+
+            <div class="flex gap-8" style="justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addTxModal').classList.remove('open')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Transaction</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function applyFilters() {
+    const type = document.getElementById('typeFilter').value;
+    const coin = document.getElementById('coinFilter').value;
+    const q = document.getElementById('txSearch').value.toLowerCase();
+    const rows = document.querySelectorAll('#txBody tr');
+    rows.forEach(r => {
+        const matchType = !type || r.dataset.type === type;
+        const matchCoin = !coin || r.dataset.coin === coin;
+        const matchQ = !q || r.textContent.toLowerCase().includes(q);
+        r.style.display = matchType && matchCoin && matchQ ? '' : 'none';
+    });
+}
+
+function clearFilters() {
+    ['typeFilter','coinFilter','txSearch','dateFrom','dateTo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    applyFilters();
+}
+
+function editTx(id) {
+    alert('Edit transaction #' + id);
+}
+</script>
+{% endblock %}

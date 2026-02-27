@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% load cointrack_tags %}
+{% block title %}{{ coin.name|default:"Bitcoin" }} ({{ coin.symbol|default:"BTC" }}) — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Breadcrumb -->
+    <div style="padding:16px 0; font-size:12px; color:var(--text-3);">
+        <a href="{% url 'markets' %}" style="color:var(--text-3);">Markets</a> / <span style="color:var(--text-1);">{{ coin.name|default:"Bitcoin" }}</span>
+    </div>
+
+    <!-- Coin Header -->
+    <div class="flex items-center justify-between mb-24 fade-in">
+        <div class="coin-header">
+            <div class="coin-big-icon">{{ coin.symbol|default:"BTC"|slice:":2" }}</div>
+            <div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <h1 style="font-family:var(--sans);font-size:24px;font-weight:800;">{{ coin.name|default:"Bitcoin" }}</h1>
+                    <span class="badge badge-yellow">{{ coin.symbol|default:"BTC" }}</span>
+                    <span class="badge" style="background:var(--bg-3);color:var(--text-2);">Rank #{{ coin.rank|default:"1" }}</span>
+                </div>
+                <div class="flex items-center gap-16 mt-8">
+                    <div class="price-big">${{ coin.price|default:"67,420.00" }}</div>
+                    <span class="badge {% if coin.change_24h >= 0 %}badge-green{% else %}badge-red{% endif %}" style="font-size:14px;padding:6px 12px;">
+                        {% if coin.change_24h >= 0 %}▲{% else %}▼{% endif %} {{ coin.change_24h|default:"2.4" }}% (24h)
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-8">
+            <button class="btn btn-ghost" onclick="toggleWatchlist()">★ Watchlist</button>
+            <button class="btn btn-primary" onclick="document.getElementById('tradeModal').classList.add('open')">Trade</button>
+        </div>
+    </div>
+
+    <!-- Price Chart -->
+    <div class="card mb-16 fade-in-1">
+        <div class="flex items-center justify-between mb-16">
+            <div style="font-family:var(--sans);font-size:16px;font-weight:700;">Price Chart</div>
+            <div style="display:flex; gap:4px;">
+                {% for p in "1H 1D 7D 1M 3M 1Y ALL"|split:" " %}
+                <button class="btn btn-ghost btn-sm" onclick="setPeriod('{{ p }}', this)">{{ p }}</button>
+                {% endfor %}
+            </div>
+        </div>
+        <canvas id="coinChart" height="260" style="width:100%;"></canvas>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="detail-grid mb-16 fade-in-2">
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">Market Cap</div><div class="stat-row-val">${{ coin.market_cap|default:"1.32T" }}</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">24h Volume</div><div class="stat-row-val">${{ coin.volume|default:"28.4B" }}</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">Circulating Supply</div><div class="stat-row-val">{{ coin.circulating_supply|default:"19.6M" }} BTC</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">All-Time High</div><div class="stat-row-val">${{ coin.ath|default:"73,738" }}</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">All-Time Low</div><div class="stat-row-val">${{ coin.atl|default:"67.81" }}</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">Max Supply</div><div class="stat-row-val">{{ coin.max_supply|default:"21M" }} BTC</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">1h Change</div><div class="stat-row-val {% if coin.change_1h >= 0 %}pos{% else %}neg{% endif %}">{{ coin.change_1h|default:"+0.4" }}%</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">7d Change</div><div class="stat-row-val {% if coin.change_7d >= 0 %}pos{% else %}neg{% endif %}">{{ coin.change_7d|default:"+8.1" }}%</div></div></div>
+        <div class="detail-cell"><div class="stat-row"><div class="stat-row-label">30d Change</div><div class="stat-row-val {% if coin.change_30d >= 0 %}pos{% else %}neg{% endif %}">{{ coin.change_30d|default:"+21.3" }}%</div></div></div>
+    </div>
+
+    <!-- Your position -->
+    {% if user_holding %}
+    <div class="card mb-16 fade-in-3" style="border-color:var(--accent-mid); background:var(--accent-dim);">
+        <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--accent);margin-bottom:12px;">Your Position</div>
+        <div class="grid-4">
+            <div><div class="stat-row-label">Holdings</div><div class="stat-row-val">{{ user_holding.amount }} {{ coin.symbol|default:"BTC" }}</div></div>
+            <div><div class="stat-row-label">Value</div><div class="stat-row-val">${{ user_holding.value }}</div></div>
+            <div><div class="stat-row-label">Avg Buy</div><div class="stat-row-val">${{ user_holding.avg_buy }}</div></div>
+            <div><div class="stat-row-label">P&L</div><div class="stat-row-val {% if user_holding.pnl >= 0 %}pos{% else %}neg{% endif %}">${{ user_holding.pnl }}</div></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Description -->
+    <div class="card fade-in-4">
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;margin-bottom:12px;">About {{ coin.name|default:"Bitcoin" }}</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.8;" id="coinDesc">
+            {{ coin.description|default:"Bitcoin is a decentralised digital currency created in 2008 by an unknown person or group using the pseudonym Satoshi Nakamoto. It operates without a central bank or single administrator and transactions are verified by network nodes through cryptography." }}
+        </div>
+    </div>
+</div>
+
+<!-- Trade Modal -->
+<div class="modal-overlay" id="tradeModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Trade {{ coin.symbol|default:"BTC" }}</div>
+            <button class="modal-close" onclick="document.getElementById('tradeModal').classList.remove('open')">✕</button>
+        </div>
+        <div style="display:flex; gap:0; margin-bottom:20px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
+            <button class="btn w-full" id="buyTab" onclick="setTradeTab('buy')" style="border:none;border-radius:0;background:var(--accent-dim);color:var(--accent);">Buy</button>
+            <button class="btn w-full" id="sellTab" onclick="setTradeTab('sell')" style="border:none;border-radius:0;background:transparent;color:var(--text-2);">Sell</button>
+        </div>
+        <form method="post" action="{% url 'add_transaction' %}">
+            {% csrf_token %}
+            <input type="hidden" name="coin_id" value="{{ coin.id|default:'bitcoin' }}">
+            <input type="hidden" name="type" id="tradeType" value="buy">
+            <div class="form-group">
+                <label>Amount ({{ coin.symbol|default:"BTC" }})</label>
+                <input type="number" name="amount" placeholder="0.00" step="any" min="0" required oninput="calcTotal(this.value)">
+            </div>
+            <div class="form-group">
+                <label>Price ($)</label>
+                <input type="number" name="price_per_coin" value="{{ coin.price|default:'67420' }}" step="any" id="tradePrice" oninput="calcTotal()">
+            </div>
+            <div style="background:var(--bg-2); padding:12px 14px; border-radius:var(--radius); margin-bottom:20px; font-size:13px;">
+                Total: <strong id="tradeTotal">$0.00</strong>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="datetime-local" name="datetime" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">Confirm</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Draw coin chart
+const canvas = document.getElementById('coinChart');
+const ctx = canvas.getContext('2d');
+canvas.width = canvas.parentElement.clientWidth;
+
+function drawCoinChart(points) {
+    const W = canvas.width, H = 260;
+    const pad = {top:10, right:10, bottom:30, left:60};
+    const iW = W - pad.left - pad.right, iH = H - pad.top - pad.bottom;
+    const mn = Math.min(...points), mx = Math.max(...points);
+    const range = mx - mn || 1;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (iH/4)*i;
+        ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W-pad.right, y); ctx.stroke();
+        ctx.fillStyle = '#484f58'; ctx.font = '10px Space Mono';
+        ctx.fillText('$'+Math.round(mx-(range/4)*i).toLocaleString(), 2, y+4);
+    }
+
+    const pts = points.map((v,i) => ({
+        x: pad.left + iW/(points.length-1)*i,
+        y: pad.top + iH - ((v-mn)/range)*iH
+    }));
+
+    const grad = ctx.createLinearGradient(0,pad.top,0,H-pad.bottom);
+    grad.addColorStop(0,'rgba(0,255,157,0.2)');
+    grad.addColorStop(1,'rgba(0,255,157,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i=1;i<pts.length;i++) {
+        const cpx = pts[i-1].x + (pts[i].x-pts[i-1].x)/2;
+        ctx.bezierCurveTo(cpx,pts[i-1].y,cpx,pts[i].y,pts[i].x,pts[i].y);
+    }
+    ctx.lineTo(pts[pts.length-1].x, H-pad.bottom);
+    ctx.lineTo(pts[0].x, H-pad.bottom);
+    ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i=1;i<pts.length;i++) {
+        const cpx = pts[i-1].x + (pts[i].x-pts[i-1].x)/2;
+        ctx.bezierCurveTo(cpx,pts[i-1].y,cpx,pts[i].y,pts[i].x,pts[i].y);
+    }
+    ctx.strokeStyle='#00ff9d'; ctx.lineWidth=2; ctx.stroke();
+}
+
+const sampleData = {{ chart_data|default:"[60000,62000,61500,64000,66000,65000,67000,67420]"|safe }};
+drawCoinChart(sampleData);
+
+function setPeriod(p, el) {
+    document.querySelectorAll('.btn-ghost').forEach(b=>b.style.removeProperty('color'));
+    el.style.color = 'var(--accent)';
+    // Fetch real data in production
+}
+
+function setTradeTab(tab) {
+    document.getElementById('tradeType').value = tab;
+    document.getElementById('buyTab').style.background = tab==='buy' ? 'var(--accent-dim)' : 'transparent';
+    document.getElementById('buyTab').style.color = tab==='buy' ? 'var(--accent)' : 'var(--text-2)';
+    document.getElementById('sellTab').style.background = tab==='sell' ? 'var(--red-dim)' : 'transparent';
+    document.getElementById('sellTab').style.color = tab==='sell' ? 'var(--red)' : 'var(--text-2)';
+}
+
+function calcTotal(amount) {
+    const a = parseFloat(amount) || 0;
+    const p = parseFloat(document.getElementById('tradePrice').value) || 0;
+    document.getElementById('tradeTotal').textContent = '$'+(a*p).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function toggleWatchlist() {
+    fetch('/api/watchlist/toggle/', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}','Content-Type':'application/json'}, body:JSON.stringify({coin_id:'{{ coin.id|default:"bitcoin" }}'})});
+}
+</script>
+{% endblock %}

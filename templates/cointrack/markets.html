@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% load cointrack_tags %}
+{% block title %}Markets — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header flex items-center justify-between fade-in">
+        <div>
+            <div class="page-title">Markets</div>
+            <div class="page-subtitle">Live prices &mdash; Updated every 60s</div>
+        </div>
+        <div class="markets-search">
+            <span class="markets-search-icon">⌕</span>
+            <input type="search" id="marketSearch" placeholder="Search coins..." oninput="filterMarkets(this.value)">
+        </div>
+    </div>
+
+    <!-- Global market stats -->
+    <div class="mkt-stat-bar fade-in-1">
+        <div class="mkt-stat"><span>Market Cap: </span><strong>{{ global_market_cap|default:"$2.41T" }}</strong> <span class="pos">+1.8%</span></div>
+        <div class="mkt-stat"><span>24h Volume: </span><strong>{{ global_volume|default:"$98.2B" }}</strong></div>
+        <div class="mkt-stat"><span>BTC Dominance: </span><strong>{{ btc_dominance|default:"51.3%" }}</strong></div>
+        <div class="mkt-stat"><span>ETH Dominance: </span><strong>{{ eth_dominance|default:"17.1%" }}</strong></div>
+        <div class="mkt-stat"><span>Active Coins: </span><strong>{{ active_coins|default:"9,214" }}</strong></div>
+    </div>
+
+    <!-- Category tabs -->
+    <div class="category-tabs mb-16 fade-in-2">
+        <button class="cat-tab active" onclick="filterCategory('all', this)">All</button>
+        <button class="cat-tab" onclick="filterCategory('watchlist', this)">★ Watchlist</button>
+        <button class="cat-tab" onclick="filterCategory('defi', this)">DeFi</button>
+        <button class="cat-tab" onclick="filterCategory('layer1', this)">Layer 1</button>
+        <button class="cat-tab" onclick="filterCategory('layer2', this)">Layer 2</button>
+        <button class="cat-tab" onclick="filterCategory('meme', this)">Meme</button>
+        <button class="cat-tab" onclick="filterCategory('stablecoin', this)">Stablecoins</button>
+    </div>
+
+    <!-- Markets Table -->
+    <div class="card fade-in-3" style="padding:0;overflow:hidden;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:24px;"></th>
+                    <th style="width:40px;">#</th>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>1h %</th>
+                    <th>24h %</th>
+                    <th>7d %</th>
+                    <th>Market Cap</th>
+                    <th>Volume (24h)</th>
+                    <th>7D Chart</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="marketsBody">
+                {% for coin in coins %}
+                <tr class="market-row" data-category="{{ coin.category|default:'layer1' }}" data-name="{{ coin.name|lower }}" onclick="window.location='{% url 'coin_detail' coin.id|default:'bitcoin' %}'">
+                    <td onclick="event.stopPropagation()">
+                        <button class="watchlist-star {% if coin.in_watchlist %}active{% endif %}" onclick="toggleWatchlist('{{ coin.id }}', this)">★</button>
+                    </td>
+                    <td class="coin-rank">{{ coin.rank|default:forloop.counter }}</td>
+                    <td>
+                        <div class="flex items-center gap-8">
+                            <div style="width:32px;height:32px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);">{{ coin.symbol|default:"BT"|slice:":2" }}</div>
+                            <div>
+                                <div style="font-weight:700;font-size:13px;">{{ coin.name|default:"Bitcoin" }}</div>
+                                <div class="text-sm text-muted">{{ coin.symbol|default:"BTC"|upper }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="font-weight:700;">${{ coin.price|default:"67,420.00" }}</td>
+                    <td class="{% if coin.change_1h >= 0 %}pos{% else %}neg{% endif %}">{{ coin.change_1h|default:"+0.4" }}%</td>
+                    <td>
+                        <span class="badge {% if coin.change_24h >= 0 %}badge-green{% else %}badge-red{% endif %}">
+                            {{ coin.change_24h|default:"+2.4" }}%
+                        </span>
+                    </td>
+                    <td class="{% if coin.change_7d >= 0 %}pos{% else %}neg{% endif %}">{{ coin.change_7d|default:"+8.1" }}%</td>
+                    <td>${{ coin.market_cap|default:"1.32T" }}</td>
+                    <td>${{ coin.volume|default:"28.4B" }}</td>
+                    <td class="sparkline-cell">
+                        <canvas class="mini-chart" width="100" height="36" data-positive="{{ coin.change_7d|default:1 }}"></canvas>
+                    </td>
+                    <td onclick="event.stopPropagation()">
+                        <a href="{% url 'coin_detail' coin.id|default:'bitcoin' %}" class="btn btn-ghost btn-sm">View →</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <!-- Demo rows -->
+                {% for c in "Bitcoin/BTC/67420/+2.4/+8.1/1.32T/28.4B,Ethereum/ETH/3521/+1.8/+5.2/423B/14.2B,Solana/SOL/182.50/-0.6/+12.4/79B/3.1B,BNB/BNB/412.30/+0.9/+3.8/61B/1.8B,XRP/XRP/0.621/+3.2/+15.2/35B/2.9B,Cardano/ADA/0.481/-1.1/-2.4/17B/0.4B,Avalanche/AVAX/38.72/+5.7/+18.3/16B/0.9B,Dogecoin/DOGE/0.142/-2.3/-4.1/20B/1.2B"|split:"," %}
+                {% with parts=c|split:"/" %}
+                <tr class="market-row" data-category="layer1" data-name="{{ parts.0|lower }}">
+                    <td><button class="watchlist-star" onclick="toggleWatchlist('{{ parts.1 }}', this)">★</button></td>
+                    <td class="coin-rank">{{ forloop.counter }}</td>
+                    <td>
+                        <div class="flex items-center gap-8">
+                            <div style="width:32px;height:32px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);">{{ parts.1|slice:":2" }}</div>
+                            <div><div style="font-weight:700;font-size:13px;">{{ parts.0 }}</div><div class="text-sm text-muted">{{ parts.1 }}</div></div>
+                        </div>
+                    </td>
+                    <td style="font-weight:700;">${{ parts.2 }}</td>
+                    <td class="pos">+0.4%</td>
+                    <td><span class="badge {% if parts.3|slice:'0:1' == '+' %}badge-green{% else %}badge-red{% endif %}">{{ parts.3 }}%</span></td>
+                    <td class="{% if parts.4|slice:'0:1' == '+' %}pos{% else %}neg{% endif %}">{{ parts.4 }}%</td>
+                    <td>${{ parts.5 }}</td>
+                    <td>${{ parts.6 }}</td>
+                    <td class="sparkline-cell"><canvas class="mini-chart" width="100" height="36" data-positive="1"></canvas></td>
+                    <td><button class="btn btn-ghost btn-sm">View →</button></td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between mt-16 fade-in-4" style="font-size:13px; color:var(--text-2);">
+        <div>Showing {{ page_start|default:"1" }}–{{ page_end|default:"50" }} of {{ total_coins|default:"9,214" }} coins</div>
+        <div class="flex gap-8">
+            {% if page.has_previous %}
+            <a href="?page={{ page.previous_page_number }}" class="btn btn-ghost btn-sm">← Prev</a>
+            {% endif %}
+            <span style="padding:5px 12px; background:var(--accent-dim); border:1px solid var(--accent-mid); border-radius:var(--radius); color:var(--accent); font-size:12px;">{{ page.number|default:1 }}</span>
+            {% if page.has_next %}
+            <a href="?page={{ page.next_page_number }}" class="btn btn-ghost btn-sm">Next →</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Draw mini sparklines
+document.querySelectorAll('.mini-chart').forEach(canvas => {
+    const ctx = canvas.getContext('2d');
+    const isPos = parseFloat(canvas.dataset.positive) >= 0;
+    const color = isPos ? '#00ff9d' : '#ff4d6a';
+    // Random-ish sparkline data
+    const pts = Array.from({length: 8}, (_, i) => 18 + Math.random() * 18 * (isPos ? 1 : -1) * (i/8) + Math.random()*10);
+    const mn = Math.min(...pts), mx = Math.max(...pts);
+    const range = mx - mn || 1;
+    const W = 100, H = 36, pad = 3;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath();
+    pts.forEach((v, i) => {
+        const x = pad + (W - pad*2) / (pts.length-1) * i;
+        const y = pad + (H - pad*2) - ((v - mn)/range) * (H - pad*2);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+});
+
+function filterMarkets(q) {
+    const rows = document.querySelectorAll('#marketsBody tr');
+    q = q.toLowerCase();
+    rows.forEach(r => {
+        const name = r.dataset.name || '';
+        r.style.display = !q || name.includes(q) || r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function filterCategory(cat, el) {
+    document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    const rows = document.querySelectorAll('#marketsBody tr');
+    rows.forEach(r => {
+        if (cat === 'all') { r.style.display = ''; return; }
+        if (cat === 'watchlist') {
+            const star = r.querySelector('.watchlist-star');
+            r.style.display = star && star.classList.contains('active') ? '' : 'none';
+            return;
+        }
+        r.style.display = (r.dataset.category === cat) ? '' : 'none';
+    });
+}
+
+function toggleWatchlist(id, btn) {
+    btn.classList.toggle('active');
+    fetch('/api/watchlist/toggle/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({coin_id: id})
+    });
+}
+</script>
+{% endblock %}

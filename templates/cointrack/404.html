@@ -1,0 +1,39 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+<!-- 404.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — CryptoVault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <div class="container">
+        <div class="code glow">404</div>
+        <div class="message">Page Not Found</div>
+        <div class="sub">This asset doesn't exist in your portfolio — or anywhere else.</div>
+        <a href="/" class="btn">← Go to Dashboard</a>
+    </div>
+    <script>
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    canvas.width = innerWidth; canvas.height = innerHeight;
+    const dots = Array.from({length:40}, ()=>({x:Math.random()*innerWidth, y:Math.random()*innerHeight, r:Math.random()*2, vx:(Math.random()-0.5)*0.3, vy:(Math.random()-0.5)*0.3, o:Math.random()*0.3}));
+    function frame() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        dots.forEach(d => {
+            d.x+=d.vx; d.y+=d.vy;
+            if(d.x<0||d.x>canvas.width) d.vx*=-1;
+            if(d.y<0||d.y>canvas.height) d.vy*=-1;
+            ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+            ctx.fillStyle=`rgba(0,255,157,${d.o})`; ctx.fill();
+        });
+        requestAnimationFrame(frame);
+    }
+    frame();
+    </script>
+</body>
+</html>

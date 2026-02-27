@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% load cointrack_tags %}
+{% block title %}Portfolio — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header flex items-center justify-between fade-in">
+        <div>
+            <div class="page-title">Portfolio</div>
+            <div class="page-subtitle">{{ holdings_count|default:"8" }} assets &mdash; Last updated just now</div>
+        </div>
+        <div class="flex gap-8">
+            <a href="{% url 'export_csv' %}" class="btn btn-ghost">↓ Export CSV</a>
+            <button class="btn btn-primary" onclick="document.getElementById('addAssetModal').classList.add('open')">+ Add Asset</button>
+        </div>
+    </div>
+
+    <!-- Summary Strip -->
+    <div class="grid-4 mb-24 fade-in-1">
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Total Value</div>
+            <div style="font-family:var(--sans);font-size:22px;font-weight:800;margin-top:4px;">{{ total_value|default:"$24,831" }}</div>
+        </div>
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Total Cost Basis</div>
+            <div style="font-family:var(--sans);font-size:22px;font-weight:800;margin-top:4px;">{{ cost_basis|default:"$18,621" }}</div>
+        </div>
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Unrealised P&L</div>
+            <div style="font-family:var(--sans);font-size:22px;font-weight:800;margin-top:4px;" class="pos">+{{ unrealised_pnl|default:"$6,210" }}</div>
+        </div>
+        <div class="card card-sm">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">ROI</div>
+            <div style="font-family:var(--sans);font-size:22px;font-weight:800;margin-top:4px;" class="pos">+{{ roi|default:"33.35" }}%</div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar fade-in-2">
+        <button class="tab-btn active" onclick="filterHoldings('all', this)">All</button>
+        <button class="tab-btn" onclick="filterHoldings('profitable', this)">Profitable</button>
+        <button class="tab-btn" onclick="filterHoldings('losing', this)">Losing</button>
+        <div style="flex:1;"></div>
+        <input type="search" id="holdingSearch" placeholder="Search..." style="width:180px;" oninput="searchHoldings(this.value)">
+    </div>
+
+    <!-- Holdings Table -->
+    <div class="card fade-in-3" style="padding:0; overflow:hidden;">
+        <table id="holdingsTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Asset <button class="sort-btn" onclick="sortTable('name')">⇅</button></th>
+                    <th>Price <button class="sort-btn" onclick="sortTable('price')">⇅</button></th>
+                    <th>Holdings</th>
+                    <th>Avg Buy Price</th>
+                    <th>Value <button class="sort-btn active" onclick="sortTable('value')">⇅</button></th>
+                    <th>P&L <button class="sort-btn" onclick="sortTable('pnl')">⇅</button></th>
+                    <th>24h <button class="sort-btn" onclick="sortTable('change')">⇅</button></th>
+                    <th>Allocation</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="holdingsBody">
+                {% for h in holdings %}
+                <tr data-profitable="{{ h.pnl_pct|default:1 }}" data-symbol="{{ h.symbol|default:'BTC' }}">
+                    <td class="text-muted">{{ forloop.counter }}</td>
+                    <td>
+                        <div class="flex items-center gap-8">
+                            <div class="coin-icon" style="background:{{ h.color|default:'var(--accent-dim)' }};color:{{ h.text_color|default:'var(--accent)' }};">{{ h.symbol|default:"BTC"|slice:":2" }}</div>
+                            <div>
+                                <div style="font-weight:700;">{{ h.name|default:"Bitcoin" }}</div>
+                                <div class="text-sm text-muted">{{ h.symbol|default:"BTC" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${{ h.current_price|default:"67,420" }}</td>
+                    <td>
+                        <div>{{ h.amount|default:"0.42" }}</div>
+                        <div class="text-sm text-muted">{{ h.symbol|default:"BTC" }}</div>
+                    </td>
+                    <td>${{ h.avg_buy_price|default:"52,100" }}</td>
+                    <td style="font-weight:700;">${{ h.value|default:"28,310" }}</td>
+                    <td>
+                        <div class="{% if h.pnl >= 0 %}pos{% else %}neg{% endif %}" style="font-weight:700;">${{ h.pnl|default:"+6,210" }}</div>
+                        <div class="text-sm {% if h.pnl_pct >= 0 %}pos{% else %}neg{% endif %}">{{ h.pnl_pct|default:"+29.4" }}%</div>
+                    </td>
+                    <td>
+                        <span class="badge {% if h.change_24h >= 0 %}badge-green{% else %}badge-red{% endif %}">
+                            {% if h.change_24h >= 0 %}▲{% else %}▼{% endif %} {{ h.change_24h|default:"2.4" }}%
+                        </span>
+                    </td>
+                    <td style="min-width:80px;">
+                        <div style="font-size:11px; color:var(--text-3); margin-bottom:2px;">{{ h.allocation|default:"45" }}%</div>
+                        <div class="progress-bar"><div class="progress-fill" style="width:{{ h.allocation|default:'45' }}%;"></div></div>
+                    </td>
+                    <td>
+                        <div class="flex gap-8">
+                            <button class="btn btn-ghost btn-sm" onclick="openEditModal('{{ h.id|default:1 }}')">Edit</button>
+                            <form method="post" action="{% url 'delete_holding' h.id|default:1 %}" style="display:inline;" onsubmit="return confirm('Remove this holding?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm">✕</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <!-- Placeholder rows -->
+                {% for item in "BTC,ETH,SOL,BNB,XRP,ADA"|split:"," %}
+                <tr>
+                    <td class="text-muted">{{ forloop.counter }}</td>
+                    <td>
+                        <div class="flex items-center gap-8">
+                            <div class="coin-icon" style="background:var(--accent-dim);color:var(--accent);">{{ item|slice:":2" }}</div>
+                            <div><div style="font-weight:700;">{{ item }}</div><div class="text-sm text-muted">{{ item }}</div></div>
+                        </div>
+                    </td>
+                    <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                    <td style="min-width:80px;"><div class="progress-bar"><div class="progress-fill" style="width:20%;"></div></div></td>
+                    <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Asset Modal -->
+<div class="modal-overlay" id="addAssetModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Add Asset</div>
+            <button class="modal-close" onclick="document.getElementById('addAssetModal').classList.remove('open')">✕</button>
+        </div>
+        <form method="post" action="{% url 'add_holding' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Cryptocurrency</label>
+                <select name="coin_id" required>
+                    <option value="">Select coin...</option>
+                    <option value="bitcoin">Bitcoin (BTC)</option>
+                    <option value="ethereum">Ethereum (ETH)</option>
+                    <option value="solana">Solana (SOL)</option>
+                    <option value="binancecoin">BNB</option>
+                    <option value="ripple">XRP</option>
+                    <option value="cardano">Cardano (ADA)</option>
+                    <option value="dogecoin">Dogecoin (DOGE)</option>
+                    <option value="avalanche-2">Avalanche (AVAX)</option>
+                </select>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" name="amount" placeholder="0.00" step="any" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Avg Buy Price ($)</label>
+                    <input type="number" name="purchase_price" placeholder="0.00" step="any" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Date Acquired</label>
+                <input type="date" name="purchase_date">
+            </div>
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea name="notes" placeholder="e.g. DCA purchase" rows="2" style="resize:vertical;"></textarea>
+            </div>
+            <div class="flex gap-8" style="justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addAssetModal').classList.remove('open')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Asset</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterHoldings(type, el) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    const rows = document.querySelectorAll('#holdingsBody tr');
+    rows.forEach(row => {
+        const pnl = parseFloat(row.dataset.profitable || 1);
+        if (type === 'all') row.style.display = '';
+        else if (type === 'profitable') row.style.display = pnl >= 0 ? '' : 'none';
+        else if (type === 'losing') row.style.display = pnl < 0 ? '' : 'none';
+    });
+}
+
+function searchHoldings(q) {
+    const rows = document.querySelectorAll('#holdingsBody tr');
+    const ql = q.toLowerCase();
+    rows.forEach(row => {
+        const sym = (row.dataset.symbol || '').toLowerCase();
+        const txt = row.textContent.toLowerCase();
+        row.style.display = (!ql || txt.includes(ql) || sym.includes(ql)) ? '' : 'none';
+    });
+}
+
+function sortTable(field) {
+    // Extend with real sort logic per field
+    console.log('Sort by', field);
+}
+
+function openEditModal(id) {
+    // In real app: fetch holding data and populate modal
+    alert('Edit holding #' + id);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% block title %}Create Account — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="auth-bg"></div>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-logo">[CV]</div>
+        <div class="auth-tagline">Create your free account</div>
+
+        {% if form.errors %}
+        <div class="alert alert-error">
+            Please fix the errors below.
+        </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'register' %}" id="registerForm">
+            {% csrf_token %}
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="first_name">First name</label>
+                    <input type="text" id="first_name" name="first_name" placeholder="Satoshi" value="{{ form.first_name.value|default:'' }}">
+                    {% if form.first_name.errors %}<div class="field-error">{{ form.first_name.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Last name</label>
+                    <input type="text" id="last_name" name="last_name" placeholder="Nakamoto" value="{{ form.last_name.value|default:'' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="username">Username</label>
+                <div class="input-icon-wrap">
+                    <span class="input-icon">@</span>
+                    <input type="text" id="username" name="username" placeholder="satoshi_n" value="{{ form.username.value|default:'' }}" autocomplete="username" required>
+                </div>
+                {% if form.username.errors %}<div class="field-error">{{ form.username.errors|join:", " }}</div>{% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email address</label>
+                <div class="input-icon-wrap">
+                    <span class="input-icon">~</span>
+                    <input type="email" id="email" name="email" placeholder="satoshi@bitcoin.org" value="{{ form.email.value|default:'' }}" required>
+                </div>
+                {% if form.email.errors %}<div class="field-error">{{ form.email.errors|join:", " }}</div>{% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="password1">Password</label>
+                <div class="input-icon-wrap">
+                    <span class="input-icon">#</span>
+                    <input type="password" id="password1" name="password1" placeholder="Min 8 characters" autocomplete="new-password" required oninput="checkStrength(this.value)">
+                    <button type="button" class="toggle-password" onclick="togglePwd('password1', this)">show</button>
+                </div>
+                <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+                <div class="strength-label text-muted" id="strengthLabel">—</div>
+                {% if form.password1.errors %}<div class="field-error">{{ form.password1.errors|join:", " }}</div>{% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="password2">Confirm password</label>
+                <div class="input-icon-wrap">
+                    <span class="input-icon">#</span>
+                    <input type="password" id="password2" name="password2" placeholder="••••••••••••" autocomplete="new-password" required>
+                    <button type="button" class="toggle-password" onclick="togglePwd('password2', this)">show</button>
+                </div>
+                {% if form.password2.errors %}<div class="field-error">{{ form.password2.errors|join:", " }}</div>{% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="currency">Preferred currency</label>
+                <select id="currency" name="preferred_currency">
+                    <option value="USD">USD — US Dollar</option>
+                    <option value="EUR">EUR — Euro</option>
+                    <option value="GBP">GBP — British Pound</option>
+                    <option value="JPY">JPY — Japanese Yen</option>
+                    <option value="KES">KES — Kenyan Shilling</option>
+                    <option value="NGN">NGN — Nigerian Naira</option>
+                </select>
+            </div>
+
+            <label style="display:flex; align-items:flex-start; gap:10px; text-transform:none; letter-spacing:0; cursor:pointer; color:var(--text-2); font-size:12px; margin-bottom:20px;">
+                <input type="checkbox" name="agree_terms" style="width:auto; margin-top:3px; accent-color:var(--accent);" required>
+                I agree to the <a href="{% url 'terms' %}" style="margin-left:4px;">Terms of Service</a> and <a href="{% url 'privacy' %}" style="margin-left:4px;">Privacy Policy</a>
+            </label>
+
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center; padding:12px;">
+                Create Account →
+            </button>
+        </form>
+
+        <div style="text-align:center; color:var(--text-2); font-size:13px; margin-top:24px;">
+            Already have an account? <a href="{% url 'login' %}">Sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePwd(id, btn) {
+    const input = document.getElementById(id);
+    input.type = input.type === 'password' ? 'text' : 'password';
+    btn.textContent = input.type === 'password' ? 'show' : 'hide';
+}
+
+function checkStrength(pwd) {
+    const fill = document.getElementById('strengthFill');
+    const label = document.getElementById('strengthLabel');
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+    const levels = [
+        { w: '0%', c: 'var(--red)', t: '—' },
+        { w: '25%', c: 'var(--red)', t: 'Weak' },
+        { w: '50%', c: 'var(--yellow)', t: 'Fair' },
+        { w: '75%', c: 'var(--blue)', t: 'Good' },
+        { w: '100%', c: 'var(--accent)', t: 'Strong' },
+    ];
+    const l = levels[score];
+    fill.style.width = l.w;
+    fill.style.background = l.c;
+    label.textContent = l.t;
+    label.style.color = l.c;
+}
+</script>
+{% endblock %}

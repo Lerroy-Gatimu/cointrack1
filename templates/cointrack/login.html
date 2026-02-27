@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% block title %}Login — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="auth-bg"></div>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-logo">[CV]</div>
+        <div class="auth-tagline">CryptoVault — Track. Analyse. Grow.</div>
+
+        {% if form.errors %}
+        <div class="alert alert-error">Invalid credentials. Please try again.</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <div class="form-group">
+                <label for="username">Username</label>
+                <div class="input-icon-wrap">
+                    <span class="input-icon">@</span>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        placeholder="satoshi"
+                        value="{{ form.username.value|default:'' }}"
+                        autocomplete="username"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-icon-wrap">
+                    <span class="input-icon">#</span>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="••••••••••••"
+                        autocomplete="current-password"
+                        required
+                    >
+                    <button type="button" class="toggle-password" onclick="togglePwd('password', this)">show</button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between mb-16" style="font-size:13px;">
+                <label style="display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; cursor:pointer; margin:0; color:var(--text-2);">
+                    <input type="checkbox" name="remember_me" style="width:auto; accent-color:var(--accent);"> Remember me
+                </label>
+                <a href="{% url 'password_reset' %}" style="color:var(--text-2); font-size:12px;">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center; padding:12px;">
+                Sign In →
+            </button>
+        </form>
+
+        <div class="auth-divider">or</div>
+
+        <div class="auth-footer-text">
+            No account? <a href="{% url 'register' %}">Create one free</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePwd(id, btn) {
+    const input = document.getElementById(id);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'hide';
+    } else {
+        input.type = 'password';
+        btn.textContent = 'show';
+    }
+}
+</script>
+{% endblock %}

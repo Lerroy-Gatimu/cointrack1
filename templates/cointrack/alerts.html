@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% block title %}Alerts — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header flex items-center justify-between fade-in">
+        <div>
+            <div class="page-title">Price Alerts</div>
+            <div class="page-subtitle">Get notified when prices hit your targets</div>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('addAlertModal').classList.add('open')">+ New Alert</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid-3 mb-24 fade-in-1">
+        <div class="card card-sm flex items-center gap-16">
+            <div style="font-size:24px;">🔔</div>
+            <div>
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Active Alerts</div>
+                <div style="font-family:var(--sans);font-size:22px;font-weight:800;">{{ active_alert_count|default:"5" }}</div>
+            </div>
+        </div>
+        <div class="card card-sm flex items-center gap-16">
+            <div style="font-size:24px;">⚡</div>
+            <div>
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Triggered (24h)</div>
+                <div style="font-family:var(--sans);font-size:22px;font-weight:800;color:var(--yellow);">{{ triggered_count|default:"2" }}</div>
+            </div>
+        </div>
+        <div class="card card-sm flex items-center gap-16">
+            <div style="font-size:24px;">📧</div>
+            <div>
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Notification</div>
+                <div style="font-family:var(--sans);font-size:16px;font-weight:700;">Email + Browser</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Triggered Alerts -->
+    {% if triggered_alerts %}
+    <div class="mb-16 fade-in-2">
+        <h2 style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--yellow);margin-bottom:12px;">⚡ Recently Triggered</h2>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            {% for alert in triggered_alerts %}
+            <div class="alert-card triggered">
+                <div class="alert-icon alert-above">🎯</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;">{{ alert.coin|default:"BTC" }} hit <span style="color:var(--yellow);">${{ alert.target|default:"65,000" }}</span></div>
+                    <div class="text-sm text-muted">Triggered {{ alert.triggered_at|timesince|default:"2 hours" }} ago</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="dismissAlert('{{ alert.id }}')">Dismiss</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Active alerts -->
+    <div class="fade-in-3">
+        <h2 style="font-family:var(--sans);font-size:15px;font-weight:700;margin-bottom:12px;">Active Alerts</h2>
+        <div style="display:flex;flex-direction:column;gap:8px;" id="alertsList">
+
+            {% for alert in alerts %}
+            <div class="alert-card {% if not alert.active %}inactive{% endif %}" id="alert-{{ alert.id }}">
+                <div class="alert-icon {% if alert.condition == 'above' %}alert-above{% elif alert.condition == 'below' %}alert-below{% else %}alert-pct{% endif %}">
+                    {% if alert.condition == 'above' %}↑{% elif alert.condition == 'below' %}↓{% else %}%{% endif %}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; display:flex; align-items:center; gap:8px;">
+                        {{ alert.coin|default:"BTC" }}
+                        <span class="badge {% if alert.condition == 'above' %}badge-green{% else %}badge-red{% endif %}">
+                            {{ alert.condition|default:"above"|upper }} ${{ alert.target|default:"70,000" }}
+                        </span>
+                    </div>
+                    <div class="text-sm text-muted mt-8">
+                        Current: ${{ alert.current_price|default:"67,420" }} &middot;
+                        {% if alert.condition == 'above' %}
+                        {{ alert.distance|default:"3.7" }}% away
+                        {% else %}
+                        {{ alert.distance|default:"1.2" }}% away
+                        {% endif %}
+                        &middot; Created {{ alert.created_at|date:"M d"|default:"Jan 10" }}
+                    </div>
+                </div>
+                <div class="flex items-center gap-16">
+                    <label class="toggle-switch">
+                        <input type="checkbox" {% if alert.active %}checked{% endif %} onchange="toggleAlert('{{ alert.id }}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <button class="btn btn-danger btn-sm" onclick="deleteAlert('{{ alert.id }}')">✕</button>
+                </div>
+            </div>
+            {% empty %}
+            <!-- Demo alerts -->
+            <div class="alert-card">
+                <div class="alert-icon alert-above">↑</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; display:flex; align-items:center; gap:8px;">BTC <span class="badge badge-green">ABOVE $70,000</span></div>
+                    <div class="text-sm text-muted mt-8">Current: $67,420 &middot; 3.7% away &middot; Created Jan 10</div>
+                </div>
+                <div class="flex items-center gap-16">
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    <button class="btn btn-danger btn-sm">✕</button>
+                </div>
+            </div>
+            <div class="alert-card">
+                <div class="alert-icon alert-below">↓</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; display:flex; align-items:center; gap:8px;">ETH <span class="badge badge-red">BELOW $3,000</span></div>
+                    <div class="text-sm text-muted mt-8">Current: $3,521 &middot; 14.8% away &middot; Created Jan 8</div>
+                </div>
+                <div class="flex items-center gap-16">
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    <button class="btn btn-danger btn-sm">✕</button>
+                </div>
+            </div>
+            <div class="alert-card">
+                <div class="alert-icon alert-pct" style="font-size:14px;font-weight:700;color:var(--blue);">%</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; display:flex; align-items:center; gap:8px;">SOL <span class="badge" style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.3);">+10% IN 24H</span></div>
+                    <div class="text-sm text-muted mt-8">Current 24h change: -0.6% &middot; Created Jan 12</div>
+                </div>
+                <div class="flex items-center gap-16">
+                    <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                    <button class="btn btn-danger btn-sm">✕</button>
+                </div>
+            </div>
+            <div class="alert-card inactive">
+                <div class="alert-icon alert-above">↑</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; display:flex; align-items:center; gap:8px;">DOGE <span class="badge badge-green">ABOVE $0.20</span> <span class="badge badge-yellow" style="font-size:10px;">PAUSED</span></div>
+                    <div class="text-sm text-muted mt-8">Current: $0.142 &middot; 40.8% away &middot; Created Dec 28</div>
+                </div>
+                <div class="flex items-center gap-16">
+                    <label class="toggle-switch"><input type="checkbox"><span class="toggle-slider"></span></label>
+                    <button class="btn btn-danger btn-sm">✕</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Notification Settings -->
+    <div class="card mt-24 fade-in-4">
+        <div class="section-title" style="font-family:var(--sans);font-size:16px;font-weight:700;margin-bottom:16px;">Notification Settings</div>
+        <form method="post" action="{% url 'update_alert_settings' %}">
+            {% csrf_token %}
+            <div class="grid-2 gap-24">
+                <div>
+                    <div class="form-group">
+                        <label>Email notifications</label>
+                        <div class="flex items-center gap-8" style="margin-top:8px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="email_alerts" {% if notification_settings.email %}checked{% endif %}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="text-sm text-muted">Send to {{ user.email }}</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Browser push notifications</label>
+                        <div class="flex items-center gap-8" style="margin-top:8px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="browser_alerts" {% if notification_settings.browser %}checked{% endif %}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="text-sm text-muted">Requires permission</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>Alert frequency</label>
+                        <select name="alert_frequency">
+                            <option value="once">Once per alert</option>
+                            <option value="hourly">Every hour if active</option>
+                            <option value="daily">Daily digest</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quiet hours</label>
+                        <div class="grid-2">
+                            <input type="time" name="quiet_from" value="{{ notification_settings.quiet_from|default:'22:00' }}">
+                            <input type="time" name="quiet_to" value="{{ notification_settings.quiet_to|default:'08:00' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Alert Modal -->
+<div class="modal-overlay" id="addAlertModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">New Price Alert</div>
+            <button class="modal-close" onclick="document.getElementById('addAlertModal').classList.remove('open')">✕</button>
+        </div>
+        <form method="post" action="{% url 'add_alert' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Cryptocurrency</label>
+                <select name="coin_id" required>
+                    <option value="">Select coin...</option>
+                    <option value="bitcoin">Bitcoin (BTC) — $67,420</option>
+                    <option value="ethereum">Ethereum (ETH) — $3,521</option>
+                    <option value="solana">Solana (SOL) — $182.50</option>
+                    <option value="binancecoin">BNB — $412.30</option>
+                    <option value="ripple">XRP — $0.621</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Alert Type</label>
+                <div style="display:flex; gap:8px;">
+                    <label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text-2);margin:0;">
+                        <input type="radio" name="condition" value="above" style="display:none;" onchange="document.getElementById('targetLabel').textContent='Price above ($)'"> Price Above
+                    </label>
+                    <label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text-2);margin:0;">
+                        <input type="radio" name="condition" value="below" style="display:none;" onchange="document.getElementById('targetLabel').textContent='Price below ($)'"> Price Below
+                    </label>
+                    <label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text-2);margin:0;">
+                        <input type="radio" name="condition" value="pct_change" style="display:none;" onchange="document.getElementById('targetLabel').textContent='% change threshold'"> % Change
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label id="targetLabel">Target Price ($)</label>
+                <input type="number" name="target" placeholder="0.00" step="any" min="0" required>
+            </div>
+            <div class="form-group">
+                <label>Repeat</label>
+                <select name="repeat">
+                    <option value="once">Once</option>
+                    <option value="every_time">Every time condition is met</option>
+                </select>
+            </div>
+            <div class="flex gap-8" style="justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addAlertModal').classList.remove('open')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Alert</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAlert(id, active) {
+    fetch('/api/alerts/' + id + '/toggle/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({active})
+    });
+    const card = document.getElementById('alert-' + id);
+    if (card) card.classList.toggle('inactive', !active);
+}
+
+function deleteAlert(id) {
+    if (!confirm('Delete this alert?')) return;
+    fetch('/api/alerts/' + id + '/delete/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    }).then(() => {
+        const card = document.getElementById('alert-' + id);
+        if (card) card.remove();
+    });
+}
+
+function dismissAlert(id) {
+    fetch('/api/alerts/' + id + '/dismiss/', {method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'}});
+}
+</script>
+{% endblock %}

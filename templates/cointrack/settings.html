@@ -1,0 +1,323 @@
+{% extends 'base.html' %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/css/styles.css' %}">
+
+{% load cointrack_tags %}
+{% block title %}Settings — CryptoVault{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header fade-in">
+        <div class="page-title">Settings</div>
+        <div class="page-subtitle">Manage your account and preferences</div>
+    </div>
+
+    <div class="settings-layout fade-in-1">
+        <!-- Sidebar Nav -->
+        <div class="settings-nav">
+            <a class="settings-nav-item active" onclick="showSection('profile', this)">👤 Profile</a>
+            <a class="settings-nav-item" onclick="showSection('security', this)">🔐 Security</a>
+            <a class="settings-nav-item" onclick="showSection('preferences', this)">⚙️ Preferences</a>
+            <a class="settings-nav-item" onclick="showSection('api', this)">🔌 API Keys</a>
+            <a class="settings-nav-item" onclick="showSection('billing', this)">💳 Billing</a>
+            <a class="settings-nav-item" onclick="showSection('danger', this)" style="color:var(--red);">⚠️ Danger Zone</a>
+        </div>
+
+        <!-- Content -->
+        <div>
+            <!-- Profile -->
+            <div class="settings-section visible" id="sec-profile">
+                <div class="section-card">
+                    <div class="section-card-title">Profile Information</div>
+                    <div class="section-card-desc">Update your name, avatar, and public profile details.</div>
+
+                    <div class="flex items-center gap-24 mb-24">
+                        <div class="avatar-upload" onclick="document.getElementById('avatarInput').click()" title="Click to upload">
+                            {{ user.first_name|first|upper|default:user.username|first|upper }}
+                        </div>
+                        <div>
+                            <div style="font-size:13px; font-weight:700;">{{ user.get_full_name|default:user.username }}</div>
+                            <div class="text-sm text-muted">{{ user.email }}</div>
+                            <button class="btn btn-ghost btn-sm mt-8" onclick="document.getElementById('avatarInput').click()">Change avatar</button>
+                            <input type="file" id="avatarInput" style="display:none;" accept="image/*">
+                        </div>
+                    </div>
+
+                    <form method="post" action="{% url 'update_profile' %}">
+                        {% csrf_token %}
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>First name</label>
+                                <input type="text" name="first_name" value="{{ user.first_name }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Last name</label>
+                                <input type="text" name="last_name" value="{{ user.last_name }}">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" name="username" value="{{ user.username }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email address</label>
+                            <input type="email" name="email" value="{{ user.email }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Bio</label>
+                            <textarea name="bio" rows="3" placeholder="A few words about yourself...">{{ profile.bio|default:'' }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Security -->
+            <div class="settings-section" id="sec-security">
+                <div class="section-card">
+                    <div class="section-card-title">Change Password</div>
+                    <div class="section-card-desc">Use a strong password with letters, numbers and symbols.</div>
+                    <form method="post" action="{% url 'change_password' %}">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label>Current password</label>
+                            <input type="password" name="old_password" placeholder="••••••••" required>
+                        </div>
+                        <div class="form-group">
+                            <label>New password</label>
+                            <input type="password" name="new_password1" placeholder="••••••••" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm new password</label>
+                            <input type="password" name="new_password2" placeholder="••••••••" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Password</button>
+                    </form>
+                </div>
+                <div class="section-card">
+                    <div class="section-card-title">Two-Factor Authentication</div>
+                    <div class="section-card-desc">Add an extra layer of security to your account.</div>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div style="font-size:13px; font-weight:700;">Authenticator App</div>
+                            <div class="text-sm text-muted">{{ '2FA is active' if profile.two_factor_enabled else '2FA is disabled' }}</div>
+                        </div>
+                        {% if profile.two_factor_enabled %}
+                        <a href="{% url 'disable_2fa' %}" class="btn btn-danger btn-sm">Disable 2FA</a>
+                        {% else %}
+                        <a href="{% url 'setup_2fa' %}" class="btn btn-primary btn-sm">Enable 2FA</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="section-card">
+                    <div class="section-card-title">Active Sessions</div>
+                    <div class="section-card-desc">Logged-in devices and browsers.</div>
+                    {% for session in active_sessions %}
+                    <div class="flex items-center justify-between" style="padding:10px 0; border-bottom:1px solid var(--bg-2);">
+                        <div>
+                            <div style="font-size:13px; font-weight:700;">{{ session.device|default:"Chrome on macOS" }}</div>
+                            <div class="text-sm text-muted">{{ session.ip|default:"197.248.x.x" }} &middot; {{ session.last_active|timesince }} ago</div>
+                        </div>
+                        {% if session.current %}<span class="badge badge-green">Current</span>
+                        {% else %}<button class="btn btn-danger btn-sm" onclick="revokeSession('{{ session.id }}')">Revoke</button>{% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="flex items-center justify-between" style="padding:10px 0; border-bottom:1px solid var(--bg-2);">
+                        <div><div style="font-size:13px; font-weight:700;">Chrome on macOS</div><div class="text-sm text-muted">Nairobi, KE &middot; Active now</div></div>
+                        <span class="badge badge-green">Current</span>
+                    </div>
+                    {% endfor %}
+                    <button class="btn btn-danger btn-sm mt-16" onclick="if(confirm('Revoke all other sessions?')) window.location='{% url 'revoke_all_sessions' %}'">Revoke All Other Sessions</button>
+                </div>
+            </div>
+
+            <!-- Preferences -->
+            <div class="settings-section" id="sec-preferences">
+                <div class="section-card">
+                    <div class="section-card-title">Display Preferences</div>
+                    <div class="section-card-desc">Customise how the dashboard looks and behaves.</div>
+                    <form method="post" action="{% url 'update_preferences' %}">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select name="currency">
+                                <option value="USD" {% if profile.currency == 'USD' %}selected{% endif %}>USD — US Dollar</option>
+                                <option value="EUR" {% if profile.currency == 'EUR' %}selected{% endif %}>EUR — Euro</option>
+                                <option value="GBP" {% if profile.currency == 'GBP' %}selected{% endif %}>GBP — British Pound</option>
+                                <option value="KES" {% if profile.currency == 'KES' %}selected{% endif %}>KES — Kenyan Shilling</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <select name="timezone">
+                                <option>UTC</option>
+                                <option>Africa/Nairobi</option>
+                                <option>America/New_York</option>
+                                <option>Europe/London</option>
+                                <option>Asia/Tokyo</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Number format</label>
+                            <select name="number_format">
+                                <option value="en-US">1,234.56 (English)</option>
+                                <option value="de-DE">1.234,56 (German)</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom:20px;">
+                            <label>Dashboard widgets</label>
+                            {% for widget in "Portfolio chart,Allocation pie,Recent transactions,Top holdings,Market overview,News feed"|split:"," %}
+                            <label style="display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; color:var(--text-1); margin-top:10px; cursor:pointer;">
+                                <input type="checkbox" name="widgets" value="{{ widget|lower|slugify }}" checked style="width:auto; accent-color:var(--accent);"> {{ widget }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Preferences</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- API Keys -->
+            <div class="settings-section" id="sec-api">
+                <div class="section-card">
+                    <div class="section-card-title">API Keys</div>
+                    <div class="section-card-desc">Connect exchanges to automatically sync your portfolio.</div>
+                    {% for exchange in connected_exchanges %}
+                    <div class="flex items-center justify-between" style="padding:12px 0; border-bottom:1px solid var(--bg-2);">
+                        <div>
+                            <div style="font-size:13px; font-weight:700;">{{ exchange.name }}</div>
+                            <div class="text-sm text-muted">Key: ****{{ exchange.key_suffix }} &middot; Added {{ exchange.added|date:"M d, Y" }}</div>
+                        </div>
+                        <div class="flex gap-8">
+                            <span class="badge badge-green">Connected</span>
+                            <button class="btn btn-danger btn-sm" onclick="revokeKey('{{ exchange.id }}')">Remove</button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="alert alert-info">No exchanges connected yet.</div>
+                    {% endfor %}
+                    <button class="btn btn-primary mt-16" onclick="document.getElementById('addApiModal').classList.add('open')">+ Connect Exchange</button>
+                </div>
+            </div>
+
+            <!-- Billing -->
+            <div class="settings-section" id="sec-billing">
+                <div class="section-card">
+                    <div class="section-card-title">Current Plan</div>
+                    <div class="section-card-desc">You are on the <strong style="color:var(--accent);">{{ plan|default:'Free' }}</strong> plan.</div>
+                    <div class="grid-2 gap-16 mb-24">
+                        <div style="padding:20px;border:1px solid var(--border);border-radius:var(--radius);">
+                            <div style="font-family:var(--sans);font-size:18px;font-weight:800;">Free</div>
+                            <div style="font-size:24px;font-weight:800;margin:8px 0;">$0<span style="font-size:14px;color:var(--text-2);">/mo</span></div>
+                            <ul style="list-style:none;font-size:12px;color:var(--text-2);display:flex;flex-direction:column;gap:6px;">
+                                <li>✓ 10 holdings</li><li>✓ 5 alerts</li><li>✓ 30-day history</li><li>✗ CSV export</li><li>✗ API connections</li>
+                            </ul>
+                        </div>
+                        <div style="padding:20px;border:2px solid var(--accent);border-radius:var(--radius);background:var(--accent-dim);">
+                            <div style="font-family:var(--sans);font-size:18px;font-weight:800;color:var(--accent);">Pro</div>
+                            <div style="font-size:24px;font-weight:800;margin:8px 0;">$9<span style="font-size:14px;color:var(--text-2);">/mo</span></div>
+                            <ul style="list-style:none;font-size:12px;color:var(--text-2);display:flex;flex-direction:column;gap:6px;">
+                                <li>✓ Unlimited holdings</li><li>✓ Unlimited alerts</li><li>✓ Full history</li><li>✓ CSV export</li><li>✓ API connections</li>
+                            </ul>
+                            <a href="{% url 'upgrade' %}" class="btn btn-primary btn-sm mt-16">Upgrade to Pro →</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="settings-section" id="sec-danger">
+                <div class="section-card danger-zone">
+                    <div class="section-card-title" style="color:var(--red);">Danger Zone</div>
+                    <div class="section-card-desc">These actions are irreversible. Please proceed with caution.</div>
+                    <div style="display:flex;flex-direction:column;gap:16px;">
+                        <div class="flex items-center justify-between" style="padding:16px; background:var(--bg-2); border-radius:var(--radius);">
+                            <div>
+                                <div style="font-weight:700; font-size:13px;">Clear all holdings</div>
+                                <div class="text-sm text-muted">Remove all assets from your portfolio. Transactions will be kept.</div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL holdings? This cannot be undone.')) window.location='{% url 'clear_holdings' %}'">Clear Holdings</button>
+                        </div>
+                        <div class="flex items-center justify-between" style="padding:16px; background:var(--bg-2); border-radius:var(--radius);">
+                            <div>
+                                <div style="font-weight:700; font-size:13px;">Delete account</div>
+                                <div class="text-sm text-muted">Permanently delete your account and all associated data.</div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Delete Account</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Add API Key Modal -->
+<div class="modal-overlay" id="addApiModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Connect Exchange</div>
+            <button class="modal-close" onclick="document.getElementById('addApiModal').classList.remove('open')">✕</button>
+        </div>
+        <form method="post" action="{% url 'add_api_key' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Exchange</label>
+                <select name="exchange" required>
+                    <option value="">Select exchange...</option>
+                    <option>Binance</option><option>Coinbase</option><option>Kraken</option><option>Bybit</option><option>OKX</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="text" name="api_key" placeholder="Your API key" required>
+            </div>
+            <div class="form-group">
+                <label>API Secret</label>
+                <input type="password" name="api_secret" placeholder="Your API secret" required>
+            </div>
+            <div class="alert alert-info">Only grant <strong>read-only</strong> permissions. CryptoVault never trades on your behalf.</div>
+            <div class="flex gap-8" style="justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addApiModal').classList.remove('open')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Connect</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showSection(id, el) {
+    document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('visible'));
+    document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+    document.getElementById('sec-' + id).classList.add('visible');
+    el.classList.add('active');
+}
+
+function revokeSession(id) {
+    if (confirm('Revoke this session?')) {
+        fetch('/api/sessions/' + id + '/revoke/', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}})
+        .then(() => location.reload());
+    }
+}
+
+function revokeKey(id) {
+    if (confirm('Remove this API key?')) {
+        fetch('/api/exchange-keys/' + id + '/delete/', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}})
+        .then(() => location.reload());
+    }
+}
+
+function confirmDelete() {
+    const confirm1 = prompt('Type DELETE to confirm account deletion:');
+    if (confirm1 === 'DELETE') {
+        window.location = '{% url 'delete_account' %}';
+    }
+}
+</script>
+{% endblock %}
